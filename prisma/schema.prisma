@@ -1,0 +1,183 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Embedding {
+  id          String   @id @default(cuid())
+  vector      Float[]
+  pageContent String
+  metadata    Json?
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id])
+}
+
+model User {
+  id                String             @id @default(cuid())
+  name              String
+  email             String             @unique
+  password          String
+  image             String?
+  emailVerified     DateTime?
+  createdAt         DateTime           @default(now())
+  flashcardAttempts FlashcardAttempt[]
+  messages          Message[]
+  Role              Role               @default(USER)
+  userDocuments     UserDocument[]
+  highlights        Highlight[]
+}
+
+model Document {
+  id            String         @id @default(cuid())
+  url           String         @unique
+  title         String
+  createdAt     DateTime       @default(now())
+  isUploaded    Boolean        @default(true)
+  img           String?
+  tags          Tag[]
+  categoryId    String
+  category      Category       @relation(fields: [categoryId], references: [id])
+  subCategoryId String?
+  subCategory   Subcategory?   @relation(fields: [subCategoryId], references: [id], onDelete: Cascade)
+  flashcards    Flashcard[]
+  highlights    Highlight[]
+  markers       Marker[]
+  embeddings    Embedding[]
+  messages      Message[]
+  userDocuments UserDocument[]
+  videoId       String?        @unique
+  video         Video?         @relation(fields: [videoId], references: [id])
+}
+
+model Video {
+  id        String    @id @default(cuid())
+  url       String    @unique
+  title     String
+  createdAt DateTime  @default(now())
+  document  Document?
+}
+
+model UserDocument {
+  userId       String
+  isVectorised Boolean  @default(false)
+  lastAccessed DateTime @default(now())
+  documentId   String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document     Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@id([userId, documentId])
+}
+
+model Category {
+  id            String        @id @default(cuid())
+  name          String        @unique
+  subcategories Subcategory[]
+  Document      Document[]
+}
+
+model Subcategory {
+  id         String     @id @default(cuid())
+  name       String
+  categoryId String
+  category   Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  documents  Document[]
+}
+
+model Message {
+  id            String   @id @default(cuid())
+  text          String
+  createdAt     DateTime @default(now())
+  userId        String?
+  documentId    String
+  isUserMessage Boolean
+  like          Boolean  @default(false)
+  dislike       Boolean  @default(false)
+  markers       Marker[]
+  document      Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Highlight {
+  id                String            @id @default(cuid())
+  documentId        String
+  userId            String
+  pageNumber        Int?
+  type              HighlightTypeEnum
+  createdAt         DateTime          @default(now())
+  boundingRectangle Cordinate?        @relation("boundingRectangle")
+  rectangles        Cordinate[]       @relation("rectangles")
+  document          Document          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Cordinate {
+  id                             String     @id @default(cuid())
+  x1                             Float
+  y1                             Float
+  x2                             Float
+  y2                             Float
+  width                          Float
+  height                         Float
+  pageNumber                     Int?
+  markerId                       String?
+  marker                         Marker?    @relation(fields: [markerId], references: [id])
+  highlightedRectangleId         String?
+  highlightedBoundingRectangleId String?    @unique
+  highlightedBoundingRectangle   Highlight? @relation("boundingRectangle", fields: [highlightedBoundingRectangleId], references: [id], onDelete: Cascade)
+  highlightedRectangle           Highlight? @relation("rectangles", fields: [highlightedRectangleId], references: [id], onDelete: Cascade)
+}
+
+model Flashcard {
+  id                String             @id @default(cuid())
+  question          String
+  answer            String
+  documentId        String
+  userId            String
+  createdAt         DateTime           @default(now())
+  document          Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  flashcardAttempts FlashcardAttempt[]
+}
+
+model FlashcardAttempt {
+  id                String    @id @default(cuid())
+  flashcardId       String
+  userId            String
+  createdAt         DateTime  @default(now())
+  userResponse      String
+  correctResponse   String?
+  incorrectResponse String?
+  moreInfo          String?
+  flashcard         Flashcard @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+  user              User      @relation(fields: [userId], references: [id])
+}
+
+model Marker {
+  id          String      @id @default(cuid())
+  keyword     String
+  count       Int
+  documentId  String
+  messageId   String?
+  document    Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  message     Message?    @relation(fields: [messageId], references: [id])
+  coordinates Cordinate[]
+}
+
+enum Role {
+  ADMIN
+  USER
+  PREMIUM
+}
+
+enum HighlightTypeEnum {
+  TEXT
+  IMAGE
+}
+
+enum Tag {
+  Video
+  Document
+}
